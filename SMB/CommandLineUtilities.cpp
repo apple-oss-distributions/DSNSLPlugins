@@ -3,8 +3,6 @@
  *
  * @APPLE_LICENSE_HEADER_START@
  * 
- * Copyright (c) 1999-2003 Apple Computer, Inc.  All Rights Reserved.
- * 
  * This file contains Original Code and/or Modifications of Original Code
  * as defined in and that are subject to the Apple Public Source License
  * Version 2.0 (the 'License'). You may not use this file except in
@@ -61,7 +59,7 @@ int executecommand(char *command, char **output)
 }
 
 
-int myexecutecommandas(const char *command, const char* path, const char * argv[], Boolean useSHELL, size_t timeout_delay, char **output, Boolean* canceledFlag,
+int myexecutecommandas(const char *command, const char* path, char *const argv[], Boolean useSHELL, size_t timeout_delay, char **output, Boolean* canceledFlag,
 	uid_t uid, gid_t gid)
 {
 	FILE	*pipe = NULL;
@@ -171,20 +169,32 @@ int myexecutecommandas(const char *command, const char* path, const char * argv[
 #ifdef LOG_TO_FILE
 	#warning "DEBUG CODE, DO NOT SUBMIT!!!!"
 		// let's dump this out to a file
-		destFP = fopen( "/tmp/myexecutecommandas.out", "a" );
+		destFP = fopen( "/tmp/executecommand.out", "a" );
 		char				headerString[1024];
 		
 		if ( destFP )
 		{
-			sprintf( headerString, "\n**** Results %d bytes %d strlen ****\n", output_count, (*output)?strlen( *output ):0);
+			int argValue=0;
+			
+			sprintf( headerString, "********************************\n%s ", "%" ); 
+			
+			while ( argv[argValue] )
+			{
+				strcat( headerString, argv[argValue++] );
+				strcat( headerString, " " );
+			}
+			strcat( headerString, "\n" );
+			fputs( headerString, destFP );
+			
+			sprintf( headerString, "\nResults: bytes %d, strlen %d\n\n", output_count, (*output)?strlen( *output ):0);
 			fputs( headerString, destFP );
 			if ( (*output) )
 				fputs( *output, destFP );
-			fputs( "\n**** endof results *****\n\n", destFP );
+			fputs( "\n******** endof results *********\n\n", destFP );
 			fclose( destFP );
 		}
 		else
-			syslog( LOG_ALERT, "COULD NOT OPEN /tmp/myexecutecommandas.out!\n" );
+			syslog( LOG_ALERT, "COULD NOT OPEN /tmp/executecommand.out!\n" );
 #endif	
 	/* Clear error code if no error or if EAGAIN error */
 	if (ferror(pipe) == 0 || errno == EAGAIN) {
@@ -232,7 +242,7 @@ executecommand_exit:
  *	ec_popen
  *	Mimic the popen(cmdstring, "r") function.
  *---------------------------------------------------------------------------*/
-FILE *ec_popen(const char *cmdstring, const char* path, const char * argv[], Boolean useSHELL, uid_t uid, gid_t gid)
+FILE *ec_popen(const char *cmdstring, const char* path, char *const argv[], Boolean useSHELL, uid_t uid, gid_t gid)
 {
 	int		pfd[2] = {0,};
 	pid_t	pid = 0;
@@ -249,7 +259,7 @@ FILE *ec_popen(const char *cmdstring, const char* path, const char * argv[], Boo
 	}
 
 	/* Fork the child */
-	if ((pid = vfork()) < 0) {
+	if ((pid = fork()) < 0) {
 		(void) close(pfd[0]);
 		(void) close(pfd[1]);
 		return NULL;
@@ -328,6 +338,7 @@ FILE *ec_popen(const char *cmdstring, const char* path, const char * argv[], Boo
  *	we spawned (MSB only, the LSB or signal number is stripped out) or
  *	'ECHILD' if the process was prematurely killed.
  *---------------------------------------------------------------------------*/
+#define KILL_CHILDREN_IF_TIMEOUT 1
 int ec_pclose(FILE *fp, int killit)
 {
 	int		fd,stat;

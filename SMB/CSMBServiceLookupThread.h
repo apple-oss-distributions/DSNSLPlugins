@@ -3,8 +3,6 @@
  *
  * @APPLE_LICENSE_HEADER_START@
  * 
- * Copyright (c) 1999-2003 Apple Computer, Inc.  All Rights Reserved.
- * 
  * This file contains Original Code and/or Modifications of Original Code
  * as defined in and that are subject to the Apple Public Source License
  * Version 2.0 (the 'License'). You may not use this file except in
@@ -34,15 +32,22 @@
 class CSMBServiceLookupThread : public CNSLServiceLookupThread
 {
 public:
-                            CSMBServiceLookupThread		( CNSLPlugin* parentPlugin, char* serviceType, CNSLDirNodeRep* nodeDirRep, CFStringRef lmbNameRef );
+                            CSMBServiceLookupThread		( CNSLPlugin* parentPlugin, char* serviceType, CNSLDirNodeRep* nodeDirRep, CFArrayRef lmbListRef, const char* winsServer );
     virtual					~CSMBServiceLookupThread	();
         
 	virtual void*			Run							( void );
 protected:
 			void			GetWorkgroupServers			( char* workgroup );
+			void			DoBroadcastLookup			( char* workgroup, CFStringRef workgroupRef );
+			char*			CopyNextMachine				( char** buffer );
+			
 			void			AddServiceResult			( CFStringRef workgroupRef, CFStringRef netBIOSRef, CFStringRef commentRef );
+			Boolean			UseWINSURLMechanism			( void );
+
 private:
-			CFStringRef		mLMBNameRef;
+			CFArrayRef		mLMBsRef;
+	const	char*			mWINSServer;
+	CFMutableArrayRef		mResultList;
 };
 
 #endif		// #ifndef

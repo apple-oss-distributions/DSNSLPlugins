@@ -3,8 +3,6 @@
  *
  * @APPLE_LICENSE_HEADER_START@
  * 
- * Copyright (c) 1999-2003 Apple Computer, Inc.  All Rights Reserved.
- * 
  * This file contains Original Code and/or Modifications of Original Code
  * as defined in and that are subject to the Apple Public Source License
  * Version 2.0 (the 'License'). You may not use this file except in
@@ -40,7 +38,7 @@
 #pragma once
 
 #define kTCPBufferSize		1400
-#define kRAdminIPCPath		"/tmp/slpRAdmin_ipc"
+#define kRAdminIPCPath		"/var/run/slpRAdmin_ipc"
 
 const CFStringRef	kSLPRAdminNotificationSAFE_CFSTR = CFSTR("SLP RAdmin Notification");
 

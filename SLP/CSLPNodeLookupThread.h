@@ -3,8 +3,6 @@
  *
  * @APPLE_LICENSE_HEADER_START@
  * 
- * Copyright (c) 1999-2003 Apple Computer, Inc.  All Rights Reserved.
- * 
  * This file contains Original Code and/or Modifications of Original Code
  * as defined in and that are subject to the Apple Public Source License
  * Version 2.0 (the 'License'). You may not use this file except in
@@ -43,6 +41,7 @@ public:
                             CSLPNodeLookupThread		( CNSLPlugin* parentPlugin );
     virtual					~CSLPNodeLookupThread		();
     
+            void			AddResult					( const char* newNodeName );
 	virtual void*			Run							( void );
 			void			Cancel						( void ) { mCanceled = true; }
 			Boolean			IsCanceled					( void ) { return mCanceled; }
@@ -53,6 +52,7 @@ private:
     SLPHandle				mSLPRef;
 	Boolean					mCanceled;
 	Boolean					mDoItAgain;
+	Boolean					mFoundDefaultScope;
 };
 
 #endif		// #ifndef

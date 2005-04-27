@@ -3,8 +3,6 @@
  *
  * @APPLE_LICENSE_HEADER_START@
  * 
- * Copyright (c) 1999-2003 Apple Computer, Inc.  All Rights Reserved.
- * 
  * This file contains Original Code and/or Modifications of Original Code
  * as defined in and that are subject to the Apple Public Source License
  * Version 2.0 (the 'License'). You may not use this file except in
@@ -72,7 +70,7 @@ int 							executecommand(
 int								myexecutecommandas(
                                     const char *command, 
 									const char* path,
-									const char * argv[],
+									char *const argv[],
 									Boolean useSHELL, 
                                     size_t timeout_delay, 
                                     char **output, 
@@ -83,7 +81,7 @@ int								myexecutecommandas(
 FILE 							*ec_popen(
 									const char *cmdstring,
 									const char* path,
-									const char* argv[],
+									char *const argv[],
 									Boolean useSHELL, 
 									uid_t uid,
 									gid_t gid);

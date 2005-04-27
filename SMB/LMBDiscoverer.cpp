@@ -3,8 +3,6 @@
  *
  * @APPLE_LICENSE_HEADER_START@
  * 
- * Copyright (c) 1999-2003 Apple Computer, Inc.  All Rights Reserved.
- * 
  * This file contains Original Code and/or Modifications of Original Code
  * as defined in and that are subject to the Apple Public Source License
  * Version 2.0 (the 'License'). You may not use this file except in
@@ -41,8 +39,8 @@
 
 const CFStringRef	kGetPrimarySAFE_CFSTR = CFSTR("getPrimary");
 
-extern void AddNode( CFStringRef nodeNameRef );	// needs to be defined by code including this
-extern CFStringEncoding NSLGetSystemEncoding( void );
+extern void AddWorkgroup( CFStringRef nodeNameRef );	// needs to be defined by code including this
+extern CFStringEncoding NSLGetSystemEncoding( UInt32* outRegion );
 
 Boolean IsSafeToConnectToAddress( char* address );
 
@@ -91,16 +89,21 @@ void LMBDiscoverer::DiscoverCurrentWorkgroups( void )
 	
 	if ( ourLMBs )
 	{
+		CFIndex		lmbCount = CFArrayGetCount(ourLMBs);
 		DBGLOG( "LMBDiscoverer::DiscoverCurrentWorkgroups getting info from %d LMBs we know about\n", (int)CFArrayGetCount(ourLMBs) );
-		for ( CFIndex i=CFArrayGetCount(ourLMBs)-1; i>=0 && !mCurrentSearchCanceled; i-- )
+		
+		for ( CFIndex i=0; i<lmbCount && !mCurrentSearchCanceled; i++ )
 		{
 			CFStringRef		lmbRef = (CFStringRef)CFArrayGetValueAtIndex( ourLMBs, i );
 			
 			// instead of firing off threads for each LMB, just query one at a time until we get a result (should be first one)
+			DBGLOG( "LMBDiscoverer::DiscoverCurrentWorkgroups get LMB Info from %@\n", lmbRef );
 			CFArrayRef lmbResults = GetLMBInfoFromLMB( NULL, lmbRef );
 
 			if ( lmbResults )
 			{
+				Boolean		gotResults = CFArrayGetCount(lmbResults) > 0;
+				
 				for ( CFIndex j=CFArrayGetCount(lmbResults)-2; j>=0; j-=2 )
 				{
 					CFStringRef		workgroupRef = (CFStringRef)CFArrayGetValueAtIndex(lmbResults, j);
@@ -112,7 +115,13 @@ void LMBDiscoverer::DiscoverCurrentWorkgroups( void )
 
 				CFRelease( lmbResults );
 				
-				break;		// just need one set of results
+				if ( gotResults )
+				{
+					DBGLOG( "LMBDiscoverer::DiscoverCurrentWorkgroups got info from %@, ignore the rest\n", lmbRef );
+					break;		// just need one set of results
+				}
+
+				DBGLOG( "LMBDiscoverer::DiscoverCurrentWorkgroups info from %@ was useless, try another\n", lmbRef );
 			}
 		}
 
@@ -574,7 +583,7 @@ CFArrayRef LMBDiscoverer::CopyBroadcastResultsForLMB( CFStringRef workgroupRef )
 		char*		curPtr = NULL;
 		char*		curResult = NULL;
 		char*		broadcastAddress = CopyBroadcastAddress();
-		const char*	argv[6] = {0};
+		char*		argv[8] = {0};
 		char		workgroup[256] = {0,};
 		Boolean		canceled = false;
 		
@@ -588,6 +597,8 @@ CFArrayRef LMBDiscoverer::CopyBroadcastResultsForLMB( CFStringRef workgroupRef )
 			argv[2] = workgroup;
 			argv[3] = "-B";
 			argv[4] = broadcastAddress;
+			argv[5] = "-s";
+			argv[6] = kBrowsingConfFilePath;
 		
 			if ( myexecutecommandas( NULL, "/usr/bin/nmblookup", argv, false, kTimeOutVal, &resultPtr, &canceled, getuid(), getgid() ) < 0 )
 			{
@@ -701,7 +712,7 @@ void LMBDiscoverer::AddToCachedResults( CFStringRef workgroupRef, CFStringRef lm
 			CFArrayAppendValue( lmbsForWorkgroup, lmbNameRef );
 		}
 
-		AddNode( workgroupRef );
+		AddWorkgroup( workgroupRef );
 	}
 	
 	UnLockLMBsInProgress();
@@ -719,7 +730,7 @@ CFArrayRef LMBDiscoverer::CreateListOfLMBs( void )
 	char*		curPtr = NULL;
 	char*		curResult = NULL;
 	char*		broadcastAddress = CopyBroadcastAddress();
-	const char*	argv[6] = {0};
+	char*		argv[7] = {0};
 	Boolean		canceled = false;
 	
 	argv[0] = "/usr/bin/nmblookup";
@@ -758,7 +769,9 @@ CFArrayRef LMBDiscoverer::CreateListOfLMBs( void )
 						CFArrayAppendValue( ourLMBsCopy, curLMBRef );
 						CFRelease( curLMBRef );
 					}
-					
+					else if ( curLMBRef )
+						CFRelease( curLMBRef );
+						
 					free( curResult );
 				}
 	
@@ -936,7 +949,7 @@ void LMBInterrogationThread::InterrogateLMB( CFStringRef workgroupRef, CFStringR
 CFArrayRef GetLMBInfoFromLMB( CFStringRef workgroupRef, CFStringRef lmbNameRef )
 {
     char*		resultPtr = NULL;
-	const char*	argv[9] = {0};
+	char*		argv[11] = {0};
 	char		lmbName[256] = {0,};
     Boolean		canceled = false;
 	CFArrayRef	lmbResults = NULL;
@@ -949,32 +962,58 @@ CFArrayRef GetLMBInfoFromLMB( CFStringRef workgroupRef, CFStringRef lmbNameRef )
 
 		CFStringGetCString( lmbNameRef, lmbName, sizeof(lmbName), kCFStringEncodingUTF8 );
 			
-		if ( workgroupRef )
-		{
-			CFStringGetCString( workgroupRef, workgroup, sizeof(workgroup), GetWindowsSystemEncodingEquivalent() );
-			
-			argv[0] = "/usr/bin/smbclient";
-			argv[1] = "-W";
-			argv[2] = workgroup;
-			argv[3] = "-NL";
-			argv[4] = lmbName;
-			argv[5] = "-U%";
-			argv[6] = "-s";
-			argv[7] = kBrowsingConfFilePath;
+		for ( int tryNum=1; tryNum<=2 && lmbResults==NULL; tryNum++ )
+		{	
+			if ( workgroupRef )
+			{
+				CFStringGetCString( workgroupRef, workgroup, sizeof(workgroup), GetWindowsSystemEncodingEquivalent() );
+				
+				argv[0] = "/usr/bin/smbclient";
+				argv[1] = "-W";
+				argv[2] = workgroup;
+				argv[3] = "-p";
+				argv[4] = "139";
+				argv[5] = "-NL";
+				argv[6] = lmbName;
 
-			DBGLOG( "LMBDiscoverer::GetLMBInfoFromLMB calling smbclient -W %s -NL %s -U\n", workgroup, lmbName );
-		}
-		else
-		{
-			argv[0] = "/usr/bin/smbclient";
-			argv[1] = "-NL";
-			argv[2] = lmbName;
-			argv[3] = "-U%";
-			argv[4] = "-s";
-			argv[5] = kBrowsingConfFilePath;
+				if ( tryNum == 1 )
+				{
+					argv[7] = "-U%";
+					argv[8] = "-s";
+					argv[9] = kBrowsingConfFilePath;
+				}
+				else
+				{
+					argv[7] = "-s";
+					argv[8] = kBrowsingConfFilePath;
+					argv[9] = NULL;			// second try use NULL or anon
+				}
 
-			DBGLOG( "LMBDiscoverer::GetLMBInfoFromLMB calling smbclient -NL %s -U\n", lmbName );
-		}
+				DBGLOG( "LMBDiscoverer::GetLMBInfoFromLMB calling smbclient -W %s -NL %s -U\n", workgroup, lmbName );
+			}
+			else
+			{
+				argv[0] = "/usr/bin/smbclient";
+				argv[1] = "-NL";
+				argv[2] = lmbName;
+				argv[3] = "-p";
+				argv[4] = "139";
+
+				if ( tryNum == 1 )
+				{
+					argv[5] = "-U%";
+					argv[6] = "-s";
+					argv[7] = kBrowsingConfFilePath;
+				}
+				else
+				{
+					argv[5] = "-s";
+					argv[6] = kBrowsingConfFilePath;
+					argv[7] = NULL;			// second try use NULL or anon
+				}
+		
+				DBGLOG( "LMBDiscoverer::GetLMBInfoFromLMB calling smbclient -NL %s -U\n", lmbName );
+			}
 		
 		if ( myexecutecommandas( NULL, "/usr/bin/smbclient", argv, false, kLMBGoodTimeOutVal, &resultPtr, &canceled, getuid(), getgid() ) < 0 )
 		{
@@ -999,7 +1038,7 @@ CFArrayRef GetLMBInfoFromLMB( CFStringRef workgroupRef, CFStringRef lmbNameRef )
 		}
 		else
 			DBGLOG( "LMBDiscoverer::GetLMBInfoFromLMB resultPtr is NULL!\n" );
-		
+		}
 	}
 	
 	return lmbResults;
@@ -1304,11 +1343,17 @@ Boolean IsStringInArray( CFStringRef theString, CFArrayRef theArray )
 const char* GetCodePageStringForCurrentSystem( void )
 {
 	// So we want to try and map our Mac System encoding to what the equivalent windows code page
-	CFStringEncoding		encoding = NSLGetSystemEncoding();		// use our version due to bug where CFGetSystemEncoding doesn't work for boot processes
+	UInt32					region = 0;
+	CFStringEncoding		encoding = NSLGetSystemEncoding(&region);		// use our version due to bug where CFGetSystemEncoding doesn't work for boot processes
 	const char*				codePageStr = "CP437";					// United States
 	
 	switch ( encoding )
 	{
+		case kCFStringEncodingMacRoman:
+			if ( region != 0 )
+				codePageStr = "CP850";		// non-US regions should be CP850 and DOSLatin1
+		break;
+		
 		case kCFStringEncodingMacCentralEurRoman:
 		case kCFStringEncodingMacCroatian:
 		case kCFStringEncodingMacRomanian:
@@ -1407,37 +1452,6 @@ Boolean IsSafeToConnectToAddress( char* address )
 	return safeToConnect;
 }
 
-#ifdef TOOL_LOGGING
-double dsTimestamp(void)
-{
-	static uint32_t	num		= 0;
-	static uint32_t	denom	= 0;
-	uint64_t		now;
-	
-	if (denom == 0) 
-	{
-		struct mach_timebase_info tbi;
-		kern_return_t r;
-		r = mach_timebase_info(&tbi);
-		if (r != KERN_SUCCESS) 
-		{
-			syslog( LOG_ALERT, "Warning: mach_timebase_info FAILED! - error = %u\n", r);
-			return 0;
-		}
-		else
-		{
-			num		= tbi.numer;
-			denom	= tbi.denom;
-		}
-	}
-	now = mach_absolute_time();
-	
-	return (double)(now * (double)num / denom / NSEC_PER_SEC);	// return seconds
-//	return (double)(now * (double)num / denom / NSEC_PER_USEC);	// return microsecs
-//	return (double)(now * (double)num / denom);	// return nanoseconds
-}
-#endif
-
 CFStringEncoding GetWindowsSystemEncodingEquivalent( void )
 {
 	// So we want to try and map our Mac System encoding to what the equivalent windows encoding would be on the
@@ -1463,12 +1477,16 @@ kCFStringEncodingMacRomanian			kCFStringEncodingDOSLatin2
 kCFStringEncodingMacFarsi				kCFStringEncodingDOSArabic
 kCFStringEncodingMacUkrainian			kCFStringEncodingDOSCyrillic
 */
-	CFStringEncoding	encoding = NSLGetSystemEncoding();		// use our version due to bug where CFGetSystemEncoding doesn't work for boot processes
+	UInt32				region = 0;
+	CFStringEncoding	encoding = NSLGetSystemEncoding(&region);		// use our version due to bug where CFGetSystemEncoding doesn't work for boot processes
 	
 	switch ( encoding )
 	{
 		case	kCFStringEncodingMacRoman:
-			encoding = kCFStringEncodingISOLatin1;
+			if ( region == 0 )
+				encoding = kCFStringEncodingDOSLatinUS;
+			else
+				encoding = kCFStringEncodingDOSLatin1;
 		break;
 		
 		case kCFStringEncodingMacJapanese:

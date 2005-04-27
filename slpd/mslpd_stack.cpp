@@ -3,8 +3,6 @@
  *
  * @APPLE_LICENSE_HEADER_START@
  * 
- * Copyright (c) 1999-2003 Apple Computer, Inc.  All Rights Reserved.
- * 
  * This file contains Original Code and/or Modifications of Original Code
  * as defined in and that are subject to the Apple Public Source License
  * Version 2.0 (the 'License'). You may not use this file except in
@@ -59,7 +57,7 @@
 
 #include "mslp_sd.h"
 #include "slp.h"
-#include "mslp.h"         /* for LOG */
+#include "mslp.h"         /* for SLPLOG */
 #include "mslpd_mask.h"
 #include "mslpd_stack.h"
 
@@ -133,7 +131,7 @@ void stack_push(MSLPQStack *pstack, Mask *pmask, MSLPQState state) {
  */
 MSLPQframe * stack_pop(MSLPQStack *pstack) {
   if (pstack->iSize == 0) {
-    LOG(SLP_LOG_ERR,"pop: query handling stack empty");
+    SLPLOG(SLP_LOG_ERR,"pop: query handling stack empty");
     return NULL;
   }
 

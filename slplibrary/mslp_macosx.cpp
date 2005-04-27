@@ -4,8 +4,6 @@
  *
  * @APPLE_LICENSE_HEADER_START@
  * 
- * Copyright (c) 1999-2003 Apple Computer, Inc.  All Rights Reserved.
- * 
  * This file contains Original Code and/or Modifications of Original Code
  * as defined in and that are subject to the Apple Public Source License
  * Version 2.0 (the 'License'). You may not use this file except in
@@ -45,7 +43,7 @@
 
 #include "mslp_sd.h"
 #include "slp.h"
-#include "mslp.h"     /* all these includes are for the definition of LOG */
+#include "mslp.h"     /* all these includes are for the definition of SLPLOG */
 
 pthread_mutex_t		gClientMutex;
 pthread_mutex_t		gServerMutex;
@@ -125,7 +123,7 @@ EXPORT void * LinGetMutex(int iMode)
         if (iLockFileExists) {
         return OpenLockFile(MSLP_CLIENT);
         } else {
-        LOG(SLP_LOG_ERR,"LinGetMutex - lock file doesn't exist");
+        SLPLOG(SLP_LOG_ERR,"LinGetMutex - lock file doesn't exist");
         return NULL;
         }
     

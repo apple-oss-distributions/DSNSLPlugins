@@ -3,8 +3,6 @@
  *
  * @APPLE_LICENSE_HEADER_START@
  * 
- * Copyright (c) 1999-2003 Apple Computer, Inc.  All Rights Reserved.
- * 
  * This file contains Original Code and/or Modifications of Original Code
  * as defined in and that are subject to the Apple Public Source License
  * Version 2.0 (the 'License'). You may not use this file except in
@@ -67,8 +65,9 @@ void SLPHandleRegReport(
 
 void InitializeSLPDARegisterer( SLPHandle serverState )
 {
+#ifdef ENABLE_SLP_LOGGING
     SLP_LOG( SLP_LOG_MSG, "InitializeSLPDARegisterer called" );
-
+#endif
     if ( !gRegisterer )
     {
         gRegisterer = new SLPDARegisterer( serverState );
@@ -80,8 +79,9 @@ void InitializeSLPDARegisterer( SLPHandle serverState )
 
 void RegisterAllServicesWithDA( SLPHandle serverState, struct sockaddr_in sinDA, const char *pcScopes )
 {
+#ifdef ENABLE_SLP_LOGGING
     SLP_LOG( SLP_LOG_MSG, "RegisterAllServicesWithDA called" );
-
+#endif
     if ( !gRegisterer )
     {
         gRegisterer = new SLPDARegisterer( serverState );
@@ -108,8 +108,9 @@ void RegisterAllServicesWithDA( SLPHandle serverState, struct sockaddr_in sinDA,
 
 void RegisterAllServicesWithKnownDAs( SLPHandle serverState )
 {
+#ifdef ENABLE_SLP_LOGGING
     SLP_LOG( SLP_LOG_MSG, "RegisterAllServicesWithKnownDAs called" );
-
+#endif
     if ( !gRegisterer )
     {
         gRegisterer = new SLPDARegisterer( serverState );
@@ -123,8 +124,9 @@ void RegisterAllServicesWithKnownDAs( SLPHandle serverState )
 
 void RegisterNewService( RegData* newReg )
 {
+#ifdef ENABLE_SLP_LOGGING
     SLP_LOG( SLP_LOG_MSG, "RegisterNewService called, %s in (%s) with attributes: %s", newReg->mURLPtr, newReg->mScopeListPtr, newReg->mAttributeListPtr );
-    
+#endif    
     if ( gRegisterer )
     {
         RegistrationObject*		newTask = new RegistrationObject();
@@ -136,15 +138,18 @@ void RegisterNewService( RegData* newReg )
     }
     else
     {
+#ifdef ENABLE_SLP_LOGGING
         SLP_LOG( SLP_LOG_DEBUG, "RegisterNewService ignoring service since our Registerer hasn't been created!" );
+#endif
         delete( newReg );
     }
 }
 
 void DeregisterService( RegData* newReg )
 {
+#ifdef ENABLE_SLP_LOGGING
     SLP_LOG( SLP_LOG_MSG, "DeregisterService called, %s in (%s) with attributes: %s", newReg->mURLPtr, newReg->mScopeListPtr, newReg->mAttributeListPtr );
-    
+#endif    
     if ( gRegisterer )
     {
         RegistrationObject*		newTask = new RegistrationObject();
@@ -156,7 +161,9 @@ void DeregisterService( RegData* newReg )
     }
     else
     {
+#ifdef ENABLE_SLP_LOGGING
         SLP_LOG( SLP_LOG_DEBUG, "DeregisterService ignoring service since our Registerer hasn't been created!" );
+#endif
         delete( newReg );
     }
 }
@@ -229,7 +236,9 @@ SLPDARegisterer::SLPDARegisterer( SLPHandle serverState )
     
 	mSLPSA = NULL;
     mServerState = (SAState*)serverState;
-    LOG( SLP_LOG_NOTIFICATIONS, "SLPDARegisterer Created" );
+#ifdef ENABLE_SLP_LOGGING
+    SLPLOG( SLP_LOG_NOTIFICATIONS, "SLPDARegisterer Created" );
+#endif
     callBack.version = 0;
     callBack.retain = NULL;
     callBack.release = NULL;
@@ -247,8 +256,9 @@ SLPDARegisterer::SLPDARegisterer( SLPHandle serverState )
 
 SLPDARegisterer::~SLPDARegisterer()
 {
+#ifdef ENABLE_SLP_LOGGING
     SLP_LOG( SLP_LOG_MSG, "~SLPDARegisterer called" );
-    
+#endif    
     if ( mActionQueue )
         CFRelease( mActionQueue );
         
@@ -266,7 +276,9 @@ void SLPDARegisterer::AddTask( RegistrationObject* newTask )
     {
         ::CFArrayAppendValue( mActionQueue, newTask );
         
+#ifdef ENABLE_SLP_LOGGING
         SLP_LOG( SLP_LOG_MSG, "SLPDARegisterer, Task #%d Added to Queue", CFArrayGetCount(mActionQueue) );
+#endif
     }
 
     QueueUnlock();
@@ -282,7 +294,9 @@ void* SLPDARegisterer::Run()
             if ( mClearQueue )
             {
                 QueueLock();
+#ifdef ENABLE_SLP_LOGGING
                 SLP_LOG( SLP_LOG_MSG, "SLPDARegisterer clearing queue" );
+#endif
                 mClearQueue = false;
                 ::CFArrayRemoveAllValues( mActionQueue );
                 QueueUnlock();
@@ -307,17 +321,22 @@ void* SLPDARegisterer::Run()
     
                         SDLock( mServerState->pvMutex );
                         mRegFileNeedsProcessing = false;
+#ifdef ENABLE_SLP_LOGGING
                         SLP_LOG( SLP_LOG_MSG, "SLPDARegisterer: process changed reg file" );
-    
+#endif    
                         if ( process_regfile( &st, SLPGetProperty("com.sun.slp.regfile") ) < 0 )
                         {
+#ifdef ENABLE_SLP_LOGGING
                             SLP_LOG( SLP_LOG_ERR, "SLPDARegisterer: changed reg file unparsable, use old one" );
+#endif
                         }
                         else
                         {
                             store_free( mServerState->store );              /* prevent leaks     */
                             mServerState->store = st;
+#ifdef ENABLE_SLP_LOGGING
                             SLP_LOG( SLP_LOG_MSG, "SLPDARegisterer: read changed reg file, mServerState->store updated" );
+#endif
                         }
             
                         if ( mServerState->store.size > 0 )
@@ -330,7 +349,9 @@ void* SLPDARegisterer::Run()
                     else if ( mRegisterAllServices )
                     {
                         mRegisterAllServices = false;
+#ifdef ENABLE_SLP_LOGGING
                         SLP_LOG( SLP_LOG_MSG, "SLPDARegisterer propigating all services" );
+#endif
                         propogate_all_advertisements( (SAState*)mServerState );
                     }
                 }
@@ -347,8 +368,9 @@ void* SLPDARegisterer::Run()
                         char*			ignore = NULL;
                         OSStatus		status = noErr;
                         
+#ifdef ENABLE_SLP_LOGGING
                         SLP_LOG( SLP_LOG_MSG, "Handling a kRegLocalService task" );
-    
+#endif    
                         if ( !mSLPSA )
                         {
                             SLPSetProperty("com.sun.slp.isSA", "true");					// need to let the lib know that we are an SA
@@ -360,7 +382,9 @@ void* SLPDARegisterer::Run()
                         {
                             if ( !IsURL( regData->mURLPtr, strlen(regData->mURLPtr), &ignore ) )
                             {
+#ifdef ENABLE_SLP_LOGGING
                                 SLP_LOG( SLP_LOG_DEBUG, "Tried to register a bad URL: %s", regData->mURLPtr );
+#endif
                             }
                             else
                             {
@@ -382,9 +406,10 @@ void* SLPDARegisterer::Run()
                                 mRegFileNeedsProcessing = true;
                             }
                         }
+#ifdef ENABLE_SLP_LOGGING
                         else
                             SLP_LOG( SLP_LOG_DEBUG, "Tried to register a bad url/attribute combo" );
-                            
+#endif                            
                         delete regData;
                     }
                     else if ( task->action == kDeregLocalService && task->data )
@@ -394,13 +419,16 @@ void* SLPDARegisterer::Run()
                         char*			ignore = NULL;
                         OSStatus	 		status = noErr;
                         
+#ifdef ENABLE_SLP_LOGGING
                         SLP_LOG( SLP_LOG_MSG, "Handling a kDeregLocalService task" );
-    
+#endif    
                         if ( regData->mURLPtr && regData->mScopeListPtr )
                         {
                             if ( !IsURL( regData->mURLPtr, strlen(regData->mURLPtr), &ignore ) )
                             {
+#ifdef ENABLE_SLP_LOGGING
                                 SLP_LOG( SLP_LOG_DEBUG, "Tried to deregister a bad URL: %s", regData->mURLPtr );
+#endif
                             }
                             else
                             {
@@ -420,9 +448,10 @@ void* SLPDARegisterer::Run()
                                 
                             }
                         }
+#ifdef ENABLE_SLP_LOGGING
                         else
                             SLP_LOG( SLP_LOG_DEBUG, "Tried to deregister a bad url/scope combo" );
-                        
+#endif                        
                         delete regData;
                     }
                     else if ( task->action == kRegisterAllServices )		// we might have multiple of these so we just keep setting this

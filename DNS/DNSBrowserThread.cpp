@@ -3,8 +3,6 @@
  *
  * @APPLE_LICENSE_HEADER_START@
  * 
- * Copyright (c) 1999-2003 Apple Computer, Inc.  All Rights Reserved.
- * 
  * This file contains Original Code and/or Modifications of Original Code
  * as defined in and that are subject to the Apple Public Source License
  * Version 2.0 (the 'License'). You may not use this file except in
@@ -193,7 +191,7 @@ sInt32 DNSBrowserThread::StartServiceLookup( CFStringRef domain, CFStringRef ser
         DBGLOG("StartServiceLookup, waiting for mRunLoopRef\n");
         SmartSleep(500000);
     }
-        
+    
     CFStreamError 				error = {(CFStreamErrorDomain)0, 0};
     CFNetServiceClientContext 	c = {0, this, NULL, NULL, CopyBrowserDescription};
     CFNetServiceBrowserRef 		searchingBrowser = CFNetServiceBrowserCreate(NULL, BrowserCallBack, &c);
@@ -291,7 +289,7 @@ static void BrowserCallBack(CFNetServiceBrowserRef browser, CFOptionFlags flags,
     }
     else
     {
-        if ( getenv("NSLDEBUG") )
+        if ( IsNSLDebuggingEnabled() )
         {
             DBGLOG( "Browser received %s service.  Service info:\n",
                     (flags & kCFNetServiceFlagRemove) ? "remove" : "add");

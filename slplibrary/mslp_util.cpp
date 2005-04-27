@@ -3,8 +3,6 @@
  *
  * @APPLE_LICENSE_HEADER_START@
  * 
- * Copyright (c) 1999-2003 Apple Computer, Inc.  All Rights Reserved.
- * 
  * This file contains Original Code and/or Modifications of Original Code
  * as defined in and that are subject to the Apple Public Source License
  * Version 2.0 (the 'License'). You may not use this file except in
@@ -257,7 +255,9 @@ struct in_addr get_in_addr_by_name(const char* pcAddr)
         
         if (phe == NULL) 
         {
+#ifdef ENABLE_SLP_LOGGING
             mslplog(SLP_LOG_DEBUG,"get_in_addr_by_name: could not get host by name",pcAddr);
+#endif
             return ina;
         }
         
@@ -447,7 +447,7 @@ SLPInternalError get_header(const char *pcSendBuf, const char *pcRecvBuf, int le
     
     if (((pslphdr->h_usFlags = GETFLAGS(pcRecvBuf)) & 0x07) != 0) 
     {
-        LOG(SLP_LOG_ERR,"get_header: illegal flags set, process anyway");
+        SLPLOG(SLP_LOG_ERR,"get_header: illegal flags set, process anyway");
     }
     
     pslphdr->h_iOffset = GETNEXTOP(pcRecvBuf);
@@ -954,7 +954,9 @@ EXPORT SLPInternalError isAttrvalEscapedOK(const char *pcVal)
             if (strlen(pc) < 2) 
             {
             #ifndef READER_TEST      	
+#ifdef ENABLE_SLP_LOGGING
                 mslplog(SLP_LOG_DEBUG, "isAttrvalEscapedOK: token too large (>2 char)",(pc)?(pc):"");
+#endif
             #endif	
                 return SLP_PARSE_ERROR;
             }
@@ -986,7 +988,9 @@ EXPORT SLPInternalError isAttrvalEscapedOK(const char *pcVal)
             }
             
         #ifndef READER_TEST      
+#ifdef ENABLE_SLP_LOGGING
             SLP_LOG(SLP_LOG_DEBUG,"isAttrvalEscapedOK: illegal escape value: %s from %s", pc, pcVal);
+#endif
         #endif      
 
             return SLP_PARSE_ERROR;
@@ -998,7 +1002,9 @@ EXPORT SLPInternalError isAttrvalEscapedOK(const char *pcVal)
         {
 
         #ifndef READER_TEST
+#ifdef ENABLE_SLP_LOGGING
             SLP_LOG(SLP_LOG_DEBUG, "isAttrvalEscapedOK: illegal value, needs to be escaped: %s",pc);
+#endif
         #endif      
 
             return SLP_PARSE_ERROR;
@@ -1040,7 +1046,7 @@ EXPORT SLPInternalError isURLEscapedOK(const char *pcVal) {
  	   *pc == '.' || *pc == '+'  || *pc == '-' || *pc == ':') {
 	continue;
       } else {
-	LOG(SLP_LOG_ERR,
+	SLPLOG(SLP_LOG_ERR,
 	    "isURLEscapedOK: malformed service type or naming authority");
 	return SLP_PARSE_ERROR;
       }
@@ -1053,8 +1059,10 @@ EXPORT SLPInternalError isURLEscapedOK(const char *pcVal) {
       if (strlen(pc) < 2) {
 
 #ifndef READER_TEST      	
+#ifdef ENABLE_SLP_LOGGING
 	mslplog(SLP_LOG_DEBUG,
 		"isURLEscapedOK: token too large (>2 char)",(pc)?(pc):"");
+#endif
 #endif	
 	return SLP_PARSE_ERROR;
       }
@@ -1069,7 +1077,9 @@ EXPORT SLPInternalError isURLEscapedOK(const char *pcVal) {
 	   (c2 >= 'a' && c2 <= 'f'))) {
 	continue;
       } else {
+#ifdef ENABLE_SLP_LOGGING
 	SLP_LOG( SLP_LOG_DEBUG, "isURLEscapedOK: bad hex escape value");
+#endif
 	return SLP_PARSE_ERROR;
       }
     }

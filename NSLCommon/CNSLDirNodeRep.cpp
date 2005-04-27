@@ -3,8 +3,6 @@
  *
  * @APPLE_LICENSE_HEADER_START@
  * 
- * Copyright (c) 1999-2003 Apple Computer, Inc.  All Rights Reserved.
- * 
  * This file contains Original Code and/or Modifications of Original Code
  * as defined in and that are subject to the Apple Public Source License
  * Version 2.0 (the 'License'). You may not use this file except in
@@ -72,6 +70,7 @@ CNSLDirNodeRep::CNSLDirNodeRep( CNSLPlugin* parent, const void* ref )
     mSearchList = NULL;
     mCurrentIndex = 0;
     mNodeName = NULL;
+	mNodePath = NULL;
     mParentPlugin = parent;
     mRef = ref;
     mDelCounter = 0;
@@ -136,6 +135,10 @@ CNSLDirNodeRep::~CNSLDirNodeRep( void )
 			if ( mNodeName )
 				::CFRelease( mNodeName );
 			mNodeName = NULL;
+			
+			if ( mNodePath )
+				::CFRelease( mNodePath );
+			mNodePath = NULL;
 		}
 		else
 			DBGLOG( "CNSLDirNodeRep::~CNSLDirNodeRep called but we aren't initialized! (ref: %lx)\n", (UInt32)mRef );
@@ -144,18 +147,20 @@ CNSLDirNodeRep::~CNSLDirNodeRep( void )
 		DBGLOG( "0x%x CNSLDirNodeRep::~CNSLDirNodeRep called with a bad mSelfPtr!\n", this );
 }
 
-void CNSLDirNodeRep::Initialize( const char* nodeNamePtr, uid_t uid, Boolean isTopLevelNode )
+void CNSLDirNodeRep::Initialize( const char* nodeNamePtr, uid_t uid, Boolean isTopLevelNode, const char* nodePathPtr )
 {
     if ( nodeNamePtr )
     {
         CFStringRef		nodeNameRef = ::CFStringCreateWithCString(kCFAllocatorDefault, nodeNamePtr, kCFStringEncodingUTF8);
+        CFStringRef		nodePathRef = ::CFStringCreateWithCString(kCFAllocatorDefault, (nodePathPtr)?nodePathPtr:nodeNamePtr, kCFStringEncodingUTF8);
         
-        Initialize( nodeNameRef, uid, isTopLevelNode );
+        Initialize( nodeNameRef, uid, isTopLevelNode, nodePathRef );
         ::CFRelease( nodeNameRef );
+        ::CFRelease( nodePathRef );
     }
 }
 
-void CNSLDirNodeRep::Initialize( CFStringRef nodeNameRef, uid_t uid, Boolean isTopLevelNode )
+void CNSLDirNodeRep::Initialize( CFStringRef nodeNameRef, uid_t uid, Boolean isTopLevelNode, CFStringRef nodePathRef )
 {
 	DBGLOG( "CNSLDirNodeRep::Initialize called: 0x%x, uid: %d, isTopLevelNode: %d\n", (void*)this, uid, isTopLevelNode );
     
@@ -176,8 +181,22 @@ void CNSLDirNodeRep::Initialize( CFStringRef nodeNameRef, uid_t uid, Boolean isT
     callBack.equal = CNSLSearchThreadEqualCallback;
     mSearchList = ::CFArrayCreateMutable(kCFAllocatorDefault, 0, &callBack);
     
-    mNodeName = nodeNameRef;
-    ::CFRetain( mNodeName );
+	if ( CFStringFind(nodeNameRef, CFSTR("\\047"), 0).length > 0 )
+	{
+		CFMutableStringRef theString = CFStringCreateMutableCopy( NULL, 0, nodeNameRef );
+
+		CFStringFindAndReplace(theString, CFSTR("\\047"), CFSTR("/"), CFRangeMake(0,CFStringGetLength(nodeNameRef)), 0);
+
+		mNodeName = theString;
+	}
+	else
+	{
+		mNodeName = nodeNameRef;
+		::CFRetain( mNodeName );
+    }
+	
+    mNodePath = nodePathRef;
+    ::CFRetain( mNodePath );
     
     mUID = uid;
     mInitialized = true;
@@ -238,11 +257,27 @@ void CNSLDirNodeRep::AddService( CNSLResult* newResult )
 {
     this->ResultListQueueLock();
 	DBGLOG( "CNSLDirNodeRep::AddService for ref %lx\n", (UInt32)mRef );
-		
+	
     if ( mInitialized )
+	{
         ::CFArrayAppendValue( mResultList, newResult );
-    else
+    }
+	else
         DBGLOG( "CNSLDirNodeRep::AddService called but mInitialized is false! (ref: %lx)\n", (UInt32)mRef );
+    this->ResultListQueueUnlock();
+}
+
+void CNSLDirNodeRep::AddServices( CFArrayRef newResults )
+{
+    this->ResultListQueueLock();
+	DBGLOG( "CNSLDirNodeRep::AddServices for ref %lx\n", (UInt32)mRef );
+	
+    if ( mInitialized && newResults && CFArrayGetCount(newResults) > 0 )
+	{
+		CFArrayAppendArray( mResultList, newResults, CFRangeMake(0,CFArrayGetCount( newResults )) );
+    }
+	else
+        DBGLOG( "CNSLDirNodeRep::AddServices called but mInitialized is false! (ref: %lx)\n", (UInt32)mRef );
     this->ResultListQueueUnlock();
 }
 

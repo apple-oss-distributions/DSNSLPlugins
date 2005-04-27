@@ -3,8 +3,6 @@
  *
  * @APPLE_LICENSE_HEADER_START@
  * 
- * Copyright (c) 1999-2003 Apple Computer, Inc.  All Rights Reserved.
- * 
  * This file contains Original Code and/or Modifications of Original Code
  * as defined in and that are subject to the Apple Public Source License
  * Version 2.0 (the 'License'). You may not use this file except in
@@ -39,6 +37,7 @@ CSLPNodeLookupThread::CSLPNodeLookupThread( CNSLPlugin* parentPlugin )
     mSLPRef = 0;
 	mCanceled = false;
 	mDoItAgain = false;
+	mFoundDefaultScope = false;
 }
 
 CSLPNodeLookupThread::~CSLPNodeLookupThread()
@@ -80,6 +79,25 @@ void* CSLPNodeLookupThread::Run( void )
     return NULL;
 }
 
+void CSLPNodeLookupThread::AddResult( const char* newNodeName )
+{
+	DBGLOG( "CSLPNodeLookupThread::AddResult (%s)\n", newNodeName );
+	if ( strcmp( newNodeName, "DEFAULT" ) == 0 )
+	{
+		if ( mFoundDefaultScope )
+			return;					// ignore if we've already found this
+			
+		mFoundDefaultScope = true;
+	}
+	
+	CFStringRef		scopeString = CFStringCreateWithCString( NULL, newNodeName, NSLGetSystemEncoding() );
+	if ( scopeString )
+	{
+		GetParentPlugin()->AddNode( scopeString );
+		CFRelease( scopeString );
+	}
+}
+
 SLPBoolean SLPScopeLookupNotifier( SLPHandle hSLP, const char* pcScope, SLPInternalError errCode, void* pvCookie )
 {
     CSLPNodeLookupThread*	lookupObj =  (CSLPNodeLookupThread*)pvCookie;
@@ -89,6 +107,7 @@ SLPBoolean SLPScopeLookupNotifier( SLPHandle hSLP, const char* pcScope, SLPInter
     if ( lookupObj && errCode == SLP_OK && pcScope && !lookupObj->IsCanceled() )
     {
         lookupObj->AddResult( pcScope );
+
         wantMoreData = SLP_TRUE;					// still going
 	}
 

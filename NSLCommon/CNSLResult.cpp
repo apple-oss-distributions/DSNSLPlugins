@@ -3,8 +3,6 @@
  *
  * @APPLE_LICENSE_HEADER_START@
  * 
- * Copyright (c) 1999-2003 Apple Computer, Inc.  All Rights Reserved.
- * 
  * This file contains Original Code and/or Modifications of Original Code
  * as defined in and that are subject to the Apple Public Source License
  * Version 2.0 (the 'License'). You may not use this file except in
@@ -54,12 +52,12 @@ Boolean SLPRAdminNotifierEqualCallback ( const void *item1, const void *item2 )
         return false;
 }
 
-CFStringRef CNSLResult::GetURLRef( void )
+CFStringRef CNSLResult::GetURLRef( void ) const
 {
 	return GetAttributeRef( kDSNAttrURLSAFE_CFSTR );
 }
 
-CFStringRef CNSLResult::GetServiceTypeRef( void )
+CFStringRef CNSLResult::GetServiceTypeRef( void ) const
 {
 	return GetAttributeRef( kDS1AttrServiceTypeSAFE_CFSTR );
 }

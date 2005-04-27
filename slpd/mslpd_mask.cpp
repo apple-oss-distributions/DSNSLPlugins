@@ -3,8 +3,6 @@
  *
  * @APPLE_LICENSE_HEADER_START@
  * 
- * Copyright (c) 1999-2003 Apple Computer, Inc.  All Rights Reserved.
- * 
  * This file contains Original Code and/or Modifications of Original Code
  * as defined in and that are subject to the Apple Public Source License
  * Version 2.0 (the 'License'). You may not use this file except in
@@ -131,7 +129,7 @@ Mask * mask_and(Mask *pm1, Mask *pm2)
 	
 	if (pm1->iLen != pm2->iLen || pm1->iBits != pm2->iBits) 
 	{
-		LOG( SLP_LOG_FAIL, "mask_and: unequal lengths");
+		SLPLOG( SLP_LOG_FAIL, "mask_and: unequal lengths");
 		return NULL;
 	}
 
@@ -151,7 +149,7 @@ Mask * mask_or(Mask *pm1, Mask *pm2)
 	
 	if (pm1->iLen != pm2->iLen || pm1->iBits != pm2->iBits)
   	{
-		LOG( SLP_LOG_FAIL, "mask_and: unequal lengths");
+		SLPLOG( SLP_LOG_FAIL, "mask_and: unequal lengths");
 		return NULL;
 	}
 	

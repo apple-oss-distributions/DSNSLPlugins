@@ -3,8 +3,6 @@
  *
  * @APPLE_LICENSE_HEADER_START@
  * 
- * Copyright (c) 1999-2003 Apple Computer, Inc.  All Rights Reserved.
- * 
  * This file contains Original Code and/or Modifications of Original Code
  * as defined in and that are subject to the Apple Public Source License
  * Version 2.0 (the 'License'). You may not use this file except in
@@ -72,6 +70,7 @@
 #include <stdio.h>
 #endif
 
+#include <netinet/in.h>
 #include <assert.h>
 
 extern EXPORT int GetSLPPort(void);
@@ -286,7 +285,7 @@ typedef struct mslphashtable {
                       S_IWGRP | S_IROTH | S_IWOTH)
 
 /*
- * LOG DEFINITIONS
+ * SLPLOG DEFINITIONS
  */
 
 /* the following macro makes mini slp compatible with a SLPv2 test harness */
@@ -344,11 +343,11 @@ typedef enum LogLevel{
 #define LOG_FAIL(format, args...) \
         	SLP_LOG( SLP_LOG_FAIL, format , ## args )
 */           
-#ifdef LOG
-#undef LOG
+#ifdef SLPLOG
+#undef SLPLOG
 #endif
 
-#define LOG(lev,pc)         mslplog(lev,pc,NULL)
+#define SLPLOG(lev,pc)         mslplog(lev,pc,NULL)
 #define FAILERR(pc,e)       { SLP_LOG(SLP_LOG_FAIL,"%s: %s",pc,strerror(e)); return e; } 
 #define LOG_STD_ERROR_AND_RETURN(lev,pc,e)    { SLP_LOG(lev,"%s: %s",pc,strerror(e)); return e; }
 #define LOG_SLP_ERROR_AND_RETURN(lev,pc,e) { SLP_LOG(lev,"%s: %s",pc,slperror(e)); return e; }
@@ -360,7 +359,7 @@ typedef enum LogLevel{
  *
  * #define FAIL(pc)
  * #define FAILERR(pc,e)
- * #define LOG(lev,pc)
+ * #define SLPLOG(lev,pc)
  * #define LOG_STD_ERROR_AND_RETURN(lev,pc,e)    return e;
  * #define LOG_SLP_ERROR_AND_RETURN(lev,pc,e) return e;
  *

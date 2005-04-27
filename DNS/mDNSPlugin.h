@@ -3,8 +3,6 @@
  *
  * @APPLE_LICENSE_HEADER_START@
  * 
- * Copyright (c) 1999-2003 Apple Computer, Inc.  All Rights Reserved.
- * 
  * This file contains Original Code and/or Modifications of Original Code
  * as defined in and that are subject to the Apple Public Source License
  * Version 2.0 (the 'License'). You may not use this file except in
@@ -35,6 +33,7 @@
 #include "CNSLPlugin.h"
 
 #define kAFPoverTCPServiceType	"afpovertcp"
+#define	kUseMachineName			"NSLUseMachineNameForRegistration"
 
 const CFStringRef	kLocalSAFE_CFSTR = CFSTR("local");
 const CFStringRef	kLocalDotSAFE_CFSTR = CFSTR("local.");
@@ -55,7 +54,7 @@ public:
 	virtual sInt32				SetServerIdleRunLoopRef	( CFRunLoopRef idleRunLoopRef );
 	virtual	void				ActivateSelf			( void );
 
-    virtual char*				CreateNSLTypeFromRecType( char *inRecType );
+    virtual char*				CreateNSLTypeFromRecType( char *inRecType, Boolean* needToFree );
 	virtual CFStringRef			CreateRecTypeFromNativeType ( char *inNativeType );
 
 			CFStringRef			GetComputerNameString	( void ) { return mComputerNameRef; }
@@ -87,6 +86,7 @@ private:
             DNSRegistrationThread* mRegistrationThread;
             CFMutableArrayRef	mListOfServicesToRegisterManually;
 			Boolean				mStartedNodeLookups;
+			Boolean				mStartedLocalNodeLookups;
 			Boolean				mRegisteredHostedServices;
 			CFStringRef			mComputerNameRef;
 			CFStringRef			mComputerMACAddressNameRef;

@@ -3,8 +3,6 @@
  *
  * @APPLE_LICENSE_HEADER_START@
  * 
- * Copyright (c) 1999-2003 Apple Computer, Inc.  All Rights Reserved.
- * 
  * This file contains Original Code and/or Modifications of Original Code
  * as defined in and that are subject to the Apple Public Source License
  * Version 2.0 (the 'License'). You may not use this file except in
@@ -151,7 +149,9 @@ extern TESTEXPORT SLPInternalError process_reply(const char *pcSendBuf,
 			      void *pvCallback, CBType cbCallbackType);
 			    
 /* ------------------------------------------------------- mslplib_prlist.c */
+#ifdef USE_PR_LIST
 extern void prlist_modify(char **ppcList, struct sockaddr_in sin);
+#endif
 extern int recalc_sendBuf(char *pcBuf, int iLen, const char *pcList);
 
 /* ------------------------------------------------------- mslplib_regipc.c */

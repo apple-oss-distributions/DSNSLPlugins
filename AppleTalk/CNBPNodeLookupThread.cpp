@@ -3,8 +3,6 @@
  *
  * @APPLE_LICENSE_HEADER_START@
  * 
- * Copyright (c) 1999-2003 Apple Computer, Inc.  All Rights Reserved.
- * 
  * This file contains Original Code and/or Modifications of Original Code
  * as defined in and that are subject to the Apple Public Source License
  * Version 2.0 (the 'License'). You may not use this file except in
@@ -83,14 +81,14 @@ void* CNBPNodeLookupThread::Run( void )
             {
                 // so we don't have zones
                 // But we do want to publish our * zone...
-                AddResult(kNoZoneLabel);
+                AddResult(CFSTR(kNoZoneLabel));
                 status = 0;
                 actualCount = 0;
             }
         }
         else
         {
-            status = memFullErr;
+            status = eMemoryAllocError;
         }
         
         // ZIPGetZoneList returns +1 if the maxCount was exceeded.
@@ -99,7 +97,7 @@ void* CNBPNodeLookupThread::Run( void )
             bufferSize *= 2;
             mBuffer = (char *)realloc( mBuffer, bufferSize );
             if ( mBuffer == nil )
-                status = memFullErr;
+                status = eMemoryAllocError;
         }
     }
     while ( status > 0 && mBuffer );

@@ -3,8 +3,6 @@
  *
  * @APPLE_LICENSE_HEADER_START@
  * 
- * Copyright (c) 1999-2003 Apple Computer, Inc.  All Rights Reserved.
- * 
  * This file contains Original Code and/or Modifications of Original Code
  * as defined in and that are subject to the Apple Public Source License
  * Version 2.0 (the 'License'). You may not use this file except in
@@ -92,20 +90,25 @@ SLPInternalError  mslplib_init_network(SOCKET *psdUDP, SOCKET *psdTCP, SOCKET *p
     
     if (*psdUDP == INVALID_SOCKET || *psdTCP == INVALID_SOCKET)
     {
+#ifdef ENABLE_SLP_LOGGING
         SLP_LOG( SLP_LOG_DEBUG, "Could not allocate a socket" );
+#endif
         return SLP_NETWORK_INIT_FAILED;
     }
     
     iErr = setsockopt(*psdUDP, IPPROTO_IP, IP_MULTICAST_TTL, (char*)&ttl, sizeof(ttl));
+#ifdef ENABLE_SLP_LOGGING
     if (iErr < 0)
         mslplog(SLP_LOG_DEBUG,"mslplib_init_network: Could not set multicast TTL",strerror(errno));
-    
+#endif    
     iErr = setsockopt( *psdUDP, IPPROTO_IP, IP_MULTICAST_LOOP, &loop, sizeof(loop) );
     
+#ifdef ENABLE_SLP_LOGGING
     if (iErr < 0)
     {
         mslplog(SLP_LOG_DEBUG,"mslplib_init_network: Could not set ip multicast loopback option",strerror(errno));
     }
+#endif
 
     if (*psdUDP > *psdTCP) {
         *psdMax = *psdUDP;
@@ -150,9 +153,11 @@ void mslplib_daadvert_callback(SLPHandle hSLP,
   pcAttrList = pcAttrList;
   
   if ((iErr=dat_daadvert_in(pdat, sin, pcScopeList, lBootTime)) < 0) {
+#ifdef ENABLE_SLP_LOGGING
     SLPInternalError slperr = (SLPInternalError) iErr;
     mslplog(SLP_LOG_DA,"mslplib_daadvert_callback: dat_daadvert_in failed",
 	slperror(slperr));
+#endif
   }
 }
 
@@ -237,14 +242,18 @@ SLPInternalError get_tcp_result(const char *pcSendBuf, int iSendSz, struct socka
     
     if ((sd = socket(AF_INET,SOCK_STREAM,0)) < 0) 
     {
+#ifdef ENABLE_SLP_LOGGING
         mslplog(SLP_LOG_DROP,"get_tcp_result could not init tcp socket",strerror(errno));
+#endif
         return SLP_NETWORK_ERROR;
     }
     
     if (connect(sd,(struct sockaddr*) &sin, sizeof(sin)) < 0) 
     {
         CLOSESOCKET(sd);
+#ifdef ENABLE_SLP_LOGGING
         mslplog(SLP_LOG_DROP,"get_tcp_result could not connect to addr",strerror(errno));
+#endif
         return SLP_NETWORK_ERROR;
     }
     
@@ -253,7 +262,9 @@ SLPInternalError get_tcp_result(const char *pcSendBuf, int iSendSz, struct socka
     if (iResult < 0) 
     {
         CLOSESOCKET(sd);
+#ifdef ENABLE_SLP_LOGGING
         mslplog(SLP_LOG_DROP,"get_tcp_result could not writen",strerror(errno));
+#endif
         return SLP_NETWORK_ERROR;
     }
     
@@ -262,7 +273,9 @@ SLPInternalError get_tcp_result(const char *pcSendBuf, int iSendSz, struct socka
     if (iResult < HDRLEN) 
     {
         CLOSESOCKET(sd);
+#ifdef ENABLE_SLP_LOGGING
         mslplog(SLP_LOG_DROP,"get_tcp_result could not readn header",strerror(errno));
+#endif
         return SLP_NETWORK_ERROR;
     }
     
@@ -274,7 +287,9 @@ SLPInternalError get_tcp_result(const char *pcSendBuf, int iSendSz, struct socka
     {
         SLPFree(*ppcInBuf);
         CLOSESOCKET(sd);
+#ifdef ENABLE_SLP_LOGGING
         mslplog(SLP_LOG_DROP,"get_tcp_result could not readn message",strerror(errno));
+#endif
         return SLP_NETWORK_ERROR;
     } 
     
@@ -338,7 +353,9 @@ SLPInternalError get_unicast_result(
         {
             if ( errno == EINTR )
             {
+#ifdef ENABLE_SLP_LOGGING
                 SLP_LOG( SLP_LOG_DROP, "get_converge_result: select received EINTR");
+#endif
                 continue;
             }
             else
@@ -354,7 +371,9 @@ SLPInternalError get_unicast_result(
             {
                 if ( errno == EINTR )
                 {
+#ifdef ENABLE_SLP_LOGGING
                     SLP_LOG( SLP_LOG_DROP, "get_unicast_result recvfrom received EINTR");
+#endif
                     continue;
                 }
                 else
@@ -422,8 +441,10 @@ SLPInternalError get_converge_result(
     fd_set				fds, allset;
     int					numIntervals;
     long				plWaits[INTERVALS];	// INTERVALS is max number of intervals
+#ifdef USE_PR_LIST
     char*				pcPRList = NULL;
     char*				pcPrevPRList = NULL;
+#endif
     int					iErr;
     div_t				divResult;
     long				tMaxWaitSecs = tMaxwait/1000;
@@ -446,7 +467,9 @@ SLPInternalError get_converge_result(
     */
     if (SLPGetProperty("com.sun.slp.noSA") && !SDstrcasecmp(SLPGetProperty("com.sun.slp.noSA"),"true"))
     {
+#ifdef ENABLE_SLP_LOGGING
         SLP_LOG( SLP_LOG_DEBUG,"get_converge_result: Simulate converge time out");
+#endif
         return SLP_OK;
     }
 
@@ -476,7 +499,9 @@ SLPInternalError get_converge_result(
 	if ((err = set_multicast_sender_interf(sd)) != SLP_OK) 
     {
         CLOSESOCKET(sd);
+#ifdef ENABLE_SLP_LOGGING
         SLP_LOG( SLP_LOG_DEBUG,"get_converge_result: set_multicast_sender_interf, %s",slperror(err));
+#endif
 		SLPSetProperty("net.slp.multicastTTL",temp);
 		pthread_mutex_unlock( &gMulticastTTLLock );
         return err;
@@ -494,8 +519,9 @@ SLPInternalError get_converge_result(
             break; /* no time left */
         }
 
-        if (sendit && !prListMaxedOut) /* only send stuff when we are crossing 'intervals' */
+        if (sendit /*&& !prListMaxedOut*/) /* only send stuff when we are crossing 'intervals' */
         {
+#ifdef USE_PR_LIST
             if (   (pcPRList != NULL && pcPrevPRList == NULL)
 					|| (pcPRList != NULL && pcPrevPRList != NULL && SDstrcasecmp(pcPRList,pcPrevPRList) ) )
             {
@@ -517,9 +543,10 @@ SLPInternalError get_converge_result(
 					
 				iSendSz = GETLEN(pcSendBuf); /* the length of the buffer to send */
             }
-
+#endif
             numsent++; /* count the number of times sent to find the right delay */
 
+#ifdef ENABLE_SLP_LOGGING
     #ifndef NDEBUG
             if ( getenv("SLPTRACE") )
             {
@@ -529,10 +556,12 @@ SLPInternalError get_converge_result(
     #endif
             sprintf(errbuf,"get_converge_result: sent request to [%s]",inet_ntoa(sin.sin_addr));
             SLP_LOG( SLP_LOG_DEBUG,errbuf);
-
+#endif
             if (sendto(sd, pcSendBuf, iSendSz, 0, (struct sockaddr*) &sin, sizeof(struct sockaddr_in)) < 0)
             {
+#ifdef ENABLE_SLP_LOGGING
                 mslplog(SLP_LOG_DROP,"get_converge_result: multicast sendto",strerror(errno));
+#endif
                 err = SLP_NETWORK_ERROR;
                 break;
             }
@@ -545,12 +574,16 @@ SLPInternalError get_converge_result(
         {
             if ( errno == EINTR )
             {
+#ifdef ENABLE_SLP_LOGGING
                 SLP_LOG( SLP_LOG_DROP, "get_converge_result: select received EINTR");
+#endif
                 continue;
             }
             else
             {
+#ifdef ENABLE_SLP_LOGGING
                 mslplog(SLP_LOG_DEBUG,"get_converge_result: select",strerror(errno));
+#endif
                 err = SLP_NETWORK_ERROR;
                 break;
             }
@@ -562,8 +595,9 @@ SLPInternalError get_converge_result(
 
             if (lElapsed > tMaxwait)
             {
+#ifdef ENABLE_SLP_LOGGING
                 SLP_LOG( SLP_LOG_DEBUG,"get_converge_result: ran out of time");
-
+#endif
                 /* signal the calling application that we have timed out */
                 iLast = SLP_TRUE;
 
@@ -581,42 +615,48 @@ SLPInternalError get_converge_result(
 
             if (iErr >= 0 && iErr < HDRLEN+4)
             {
+#ifdef ENABLE_SLP_LOGGING
                 SLP_LOG( SLP_LOG_DROP, "get_converge_result: recvd something, smaller than a SLPv2 msg");
+#endif
                 continue;
             }
             else if (iErr < 0)
             {
+#ifdef ENABLE_SLP_LOGGING
                 if ( errno == EINTR )
                 {
                     SLP_LOG( SLP_LOG_DROP, "get_converge_result: recvfrom received EINTR");
                 }
                 else
                     mslplog(SLP_LOG_DROP,"get_converge_result: recvfrom failed",strerror(errno));
-                
+#endif                
                 continue;
             }
             len = iErr; /* result of recvfrom is # of bytes read, if result is > 0 */
 
+#ifdef ENABLE_SLP_LOGGING
     #ifndef NDEBUG
             sprintf(errbuf,"  received %d byte message from [%s]\n", len, inet_ntoa(insin.sin_addr));
             SLP_LOG( SLP_LOG_DEBUG,errbuf);
     #endif /* NDEBUG */
+#endif
 			char*		tcpBuffer = NULL;
 			
             if ( GETFLAGS(pcRecvBuf) & OVERFLOWFLAG )
             {
                 // the server is telling us that they have more scope info that can fit in a multicast, and that we should 
                 // ask it info directly
+#ifdef ENABLE_SLP_LOGGING
                 sprintf(errbuf,"get_converge_result: overflow bit set, need to resend TCP request to [%s]",inet_ntoa(insin.sin_addr));
                 SLP_LOG( SLP_LOG_MSG, errbuf );
-
+#endif
                 insin.sin_port   = htons(SLP_PORT);
 
                 if ((err=get_tcp_result(pcSendBuf,iSendSz, insin, &tcpBuffer,&len)) != SLP_OK) 
                 {
                     // ug, couldn't get the message, log and continue multicasting
                     sprintf(errbuf,"get_converge_result: error resending TCP request to [%s]: %s",inet_ntoa(insin.sin_addr), slperror(err));
-                    LOG(SLP_LOG_ERR,errbuf);
+                    SLPLOG(SLP_LOG_ERR,errbuf);
                 }
             }
            
@@ -634,29 +674,39 @@ SLPInternalError get_converge_result(
             }
             else if (err == SLP_OK && !prListMaxedOut)
             {
+#ifdef USE_PR_LIST
 				/* on a successful receive and process reply, add to PR list */
 				prlist_modify(&pcPRList,insin);
+#endif
             }
             else if ( err == SLP_REPLY_DOESNT_MATCH_REQUEST )
             {
+#ifdef ENABLE_SLP_LOGGING
                 char	errMsg[128];
                 sprintf( errMsg, "received wrong reply to our request from: %s", inet_ntoa(insin.sin_addr) );
                 SLP_LOG( SLP_LOG_DEBUG, errMsg );
+#endif
             }
             else if ( err == SLP_REQUEST_CANCELED_BY_USER )
             {
+#ifdef ENABLE_SLP_LOGGING
                 SLP_LOG( SLP_LOG_DEBUG, "get_converge_result canceled by caller" );
+#endif
                 err = SLP_OK;		// its not an error
                 break;
             }
         } /* something to read */
     } /* we through INTERVAL-1 times... */
 
+#ifdef ENABLE_SLP_LOGGING
     if ( getenv("SLPTRACE") )
         SLP_LOG( SLP_LOG_DEBUG,"trace: no time left\n");
+#endif
 
+#ifdef USE_PR_LIST
     SLPFree(pcPrevPRList);
     SLPFree(pcPRList);
+#endif
 
     return err;
 }  
@@ -669,8 +719,9 @@ static SLPBoolean time_remaining(long lTimeStart, time_t tMaxwait,
     long lSoFar = SDGetTime() - lTimeStart;
     long lTillNext = 0;
     long lDelay = 0;
+#ifdef ENABLE_SLP_LOGGING
     char errbuf[120];
-	
+#endif	
     *piSend = 0;
 
     if (lSoFar < 0) lSoFar *= -1; /* time counter wraps on some platforms */
@@ -685,6 +736,7 @@ static SLPBoolean time_remaining(long lTimeStart, time_t tMaxwait,
         
         if (lTillNext < 0) 
         {
+#ifdef ENABLE_SLP_LOGGING
 #ifndef NDEBUG
             if ( getenv("SLPTRACE") )
             {
@@ -692,13 +744,14 @@ static SLPBoolean time_remaining(long lTimeStart, time_t tMaxwait,
                 SLP_LOG( SLP_LOG_DEBUG,errbuf);
             }
 #endif /* NDEBUG */      
-
+#endif
             continue;
         }
     
         if (iNumSent <= i) 
             *piSend = 1; /* send if we haven't yet this interval */
     
+#ifdef ENABLE_SLP_LOGGING
 #ifndef NDEBUG
         if ( getenv("SLPTRACE") )
         {
@@ -709,13 +762,15 @@ static SLPBoolean time_remaining(long lTimeStart, time_t tMaxwait,
             SLP_LOG( SLP_LOG_DEBUG,errbuf);
         }
 #endif /* NDEBUG */
-
+#endif
         if (lSoFar < lSum) 
         {
             if (tMaxwait < lSum)   /* if the sum would exceed the allowed max */
             {
                 lDelay = (tMaxwait - lSoFar); /* return only remaining allowed      */
+#ifdef ENABLE_SLP_LOGGING
                 SLP_LOG( SLP_LOG_DEBUG,"         max < sum.\n");
+#endif
                 break;
             } 
             else 
@@ -733,6 +788,7 @@ static SLPBoolean time_remaining(long lTimeStart, time_t tMaxwait,
     ptv->tv_sec = lDelay;
     ptv->tv_usec = 0;  
 
+#ifdef ENABLE_SLP_LOGGING
 #ifndef NDEBUG
     if ( getenv("SLPTRACE") )
     {
@@ -741,7 +797,7 @@ static SLPBoolean time_remaining(long lTimeStart, time_t tMaxwait,
         SLP_LOG( SLP_LOG_DEBUG,errbuf);
     }
 #endif  
-
+#endif
   return SLP_TRUE;
 }
 

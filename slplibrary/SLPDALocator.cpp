@@ -3,8 +3,6 @@
  *
  * @APPLE_LICENSE_HEADER_START@
  * 
- * Copyright (c) 1999-2003 Apple Computer, Inc.  All Rights Reserved.
- * 
  * This file contains Original Code and/or Modifications of Original Code
  * as defined in and that are subject to the Apple Public Source License
  * Version 2.0 (the 'License'). You may not use this file except in
@@ -55,13 +53,15 @@ static pthread_mutex_t	gTheSLPDALLock = PTHREAD_MUTEX_INITIALIZER;
 
 #include <syslog.h>
 void StartDALocator(CFRunLoopTimerRef timer, void *info);
+void* RunWrapper ( void *arg );
 
 // This is our C function wrapper to start this threaded object
 SLPInternalError StartSLPDALocator( void* daadvert_callback, CFRunLoopRef runLoop, SLPHandle serverState )
 {
 	SLPInternalError	status = SLP_OK;
+#ifdef ENABLE_SLP_LOGGING
     SLP_LOG( SLP_LOG_DEBUG, "StartSLPDALocator called." );
-
+#endif
     LockGlobalDATable();
     status = SLPDALocator::TheSLPDAL()->Initialize( daadvert_callback, serverState );
 
@@ -70,13 +70,17 @@ SLPInternalError StartSLPDALocator( void* daadvert_callback, CFRunLoopRef runLoo
 	
     if ( !status && !SLPDALocator::TheSLPDAL()->IsRunning() )
     {
+#ifdef ENABLE_SLP_LOGGING
         SLP_LOG( SLP_LOG_DEBUG, "SLPDALocator isn't running yet, calling Start" );
+#endif
         SLPDALocator::TheSLPDAL()->Start();
     }
+#ifdef ENABLE_SLP_LOGGING
     else
     {
         SLP_LOG( SLP_LOG_DEBUG, "SLPDALocator can't call Resume, status is %d, IsRunning returned %d", status, SLPDALocator::TheSLPDAL()->IsRunning() );
     }
+#endif
     UnlockGlobalDATable();
     
     return status;
@@ -155,8 +159,9 @@ SLPDALocator* SLPDALocator::TheSLPDAL( void )
     
     if ( !gDALocator )
     {
+#ifdef ENABLE_SLP_LOGGING
         SLP_LOG( SLP_LOG_DEBUG, "Setting up a new DA Locator" );
-        
+#endif        
         gDALocator = new SLPDALocator();
     }
 
@@ -204,13 +209,16 @@ SLPDALocator::~SLPDALocator()
 	}
 	mTimer = NULL;
     
+#ifdef ENABLE_SLP_LOGGING
     SLP_LOG( SLP_LOG_DEBUG, "DA Locator has been killed" );
+#endif
 }
 
 SLPInternalError SLPDALocator::Initialize( void* daadvert_callback, SLPHandle serverState )
 {
+#ifdef ENABLE_SLP_LOGGING
     SLP_LOG( SLP_LOG_DEBUG, "Initialize called with callback: 0x%x, serverState: 0x%x", daadvert_callback, serverState );
-    
+#endif    
     if ( !mServerState )
         mServerState = serverState;
     
@@ -275,8 +283,9 @@ void SLPDALocator::Kick( void )
 		mTableReset = true;
 		mInitialDALookupStillPending = true;
 		mDALookupHasntHadAChanceToFindADAYet = true;
+#ifdef ENABLE_SLP_LOGGING
 		SLP_LOG( SLP_LOG_MSG, "SLPDALocator::Kick, %d DAs in list to remove.",mDATable->iSize );
-	
+#endif	
 		int i;
 		for (i = 0; i < mDATable->iSize; i++) 
 		{
@@ -322,7 +331,7 @@ void SLPDALocator::Start( void )
 	
 		CFRunLoopTimerContext 		c = {0, this, NULL, NULL, NULL};
 	
-		mTimer = CFRunLoopTimerCreate(NULL, CFAbsoluteTimeGetCurrent() + 0, CONFIG_DA_FIND, 0, 0, StartDALocator, (CFRunLoopTimerContext*)&c);
+		mTimer = CFRunLoopTimerCreate(NULL, CFAbsoluteTimeGetCurrent() + CONFIG_DA_INITIAL_DELAY, CONFIG_DA_FIND, 0, 0, StartDALocator, (CFRunLoopTimerContext*)&c);
 		CFRunLoopAddTimer(mRunLoopRef, mTimer, kCFRunLoopDefaultMode);
 	}
 }
@@ -342,6 +351,10 @@ void SLPDALocator::DoLookup( void )
     *  forward to them sequentially.
     */
     
+#ifdef TRACK_FUNCTION_TIMES
+	CFAbsoluteTime	startTime = CFAbsoluteTimeGetCurrent();
+	syslog( LOG_ERR, "(%s) SLPDALocator::DoLookup started\n", "SLP" );
+#endif
     //  first we are supposed to wait some random time between 0-3 seconds before starting
     // our initial DA Discovery (SLP 2608 Sec. 12.2.1) but we are going to make it 2
     const char*	pcScopes = "";
@@ -361,8 +374,9 @@ void SLPDALocator::DoLookup( void )
 	if ( Initialize() == SLP_OK )
 	{
 		// do this every time
+#ifdef ENABLE_SLP_LOGGING
 		SLP_LOG( SLP_LOG_DEBUG,"SLPDALocator starting active DA discovery");
-		
+#endif		
 		::pthread_mutex_lock( &gQueuedDALock );
 		if ( mNumQueuedDAsToLookup && !mTableReset )		// need to clear these up
 		{
@@ -389,6 +403,7 @@ void SLPDALocator::DoLookup( void )
 											(void *)mDACallback,
 											SLPDAADVERT_CALLBACK) ) < 0) )
 		{
+#ifdef ENABLE_SLP_LOGGING
 			if (err != SLP_NETWORK_TIMED_OUT )
 			{
 				mslplog(SLP_LOG_MSG,"SLPDALocator could not do DA discovery",slperror(err));
@@ -397,6 +412,7 @@ void SLPDALocator::DoLookup( void )
 			{
 				SLP_LOG( SLP_LOG_DEBUG,"SLPDALocator found no DAs");
 			}
+#endif
 		}
 		
 		CLOSESOCKET(mSocket);
@@ -415,29 +431,68 @@ void SLPDALocator::DoLookup( void )
 	
 	if ( mDeleteSelfWhenFinished )	// we were canceled but in the midst of processing
 		delete this;
+
+#ifdef TRACK_FUNCTION_TIMES
+	syslog( LOG_ERR, "(%s) SLPDALocator::DoLookup took %f seconds\n", "SLP", CFAbsoluteTimeGetCurrent() - startTime );
+#endif
 }
+
+static pthread_attr_t	_DefaultAttrs;
+static pthread_key_t	_NameKey;
+static pthread_key_t	_ObjectKey;
 
 void StartDALocator(CFRunLoopTimerRef timer, void *info) 
 {
+#ifdef TRACK_FUNCTION_TIMES
+	CFAbsoluteTime	startTime = CFAbsoluteTimeGetCurrent();
+#endif
     ::pthread_mutex_lock( &gTheSLPDALLock );
     SLPDALocator*		daLocator = (SLPDALocator*)info;
 	
+#ifdef ENABLE_SLP_LOGGING
 	SLP_LOG( SLP_LOG_DEBUG, "StartDALocator timer function called\n" );
-	
+#endif	
 	if ( daLocator )
 		daLocator->LookupInProgress();
 		
     ::pthread_mutex_unlock( &gTheSLPDALLock );
 
-	if ( daLocator )
-		daLocator->DoLookup();
+	::pthread_attr_init( &_DefaultAttrs );
+	::pthread_key_create(&_NameKey, NULL);
+	::pthread_key_create(&_ObjectKey, NULL);
+	::pthread_attr_setdetachstate( &_DefaultAttrs, PTHREAD_CREATE_DETACHED);
+
+	// Currently detaching so threads don't stick around.
+	pthread_t	tNew = NULL;
+
+    ::pthread_create( &tNew, &_DefaultAttrs, RunWrapper, (void *)daLocator );
+
+#ifdef TRACK_FUNCTION_TIMES
+	syslog( LOG_ERR, "(%s) StartDALocator took %f seconds\n", "SLP", CFAbsoluteTimeGetCurrent() - startTime );
+#endif
 }
+
+void* RunWrapper ( void *arg )
+{
+	SLPDALocator	*oMe = (SLPDALocator *)arg;
+
+	::pthread_setspecific( _ObjectKey, oMe );
+	::pthread_setspecific( _NameKey, "SLPDALocator" );
+
+	// Execute the the lookup on the thread.
+	oMe->DoLookup();
+
+	return NULL;
+
+} // _RunWrapper
 
 void SLPDALocator::LocateAndAddDA( long addrOfDA )
 {
     if ( !mServerState )
     {
+#ifdef ENABLE_SLP_LOGGING
         SLP_LOG( SLP_LOG_DEBUG, "SLPDALocator::LocateAndAddDA, no mServerState yet, we'll just add this to a queue to be processed later" );
+#endif
         ::pthread_mutex_lock( &gQueuedDALock );
         // we haven't been initialized yet, just add these to a queue to be read at that time
         long			newQueueLength = mNumQueuedDAsToLookup*sizeof(long) + sizeof(long);
@@ -473,8 +528,9 @@ void SLPDALocator::LocateAndAddDA( long addrOfDA )
         // add daOption->daList[i] to our list of DAs
         sin.sin_addr.s_addr = addrOfDA;
     
+#ifdef ENABLE_SLP_LOGGING
         SLP_LOG( SLP_LOG_DEBUG, "SLPDALocator::LocateAndAddDA going to ask DA:%s its info", inet_ntoa(sin.sin_addr) );
-
+#endif
         if (!(err = generate_srvrqst(pcSendBuf,&iMTU,"en","", "service:directory-agent",""))) 
         {
             if ((err = get_unicast_result(
@@ -487,8 +543,9 @@ void SLPDALocator::LocateAndAddDA( long addrOfDA )
                                             &len, 
                                             sin)) != SLP_OK) 
             {
+#ifdef ENABLE_SLP_LOGGING
                 SLP_LOG( SLP_LOG_DA, "get_reply could not get_da_results from [%s]...: %s",inet_ntoa(sin.sin_addr), slperror(err) );
-                
+#endif                
                 SLPFree(pcRecvBuf);
                 pcRecvBuf = NULL;
             }
@@ -506,7 +563,9 @@ void SLPDALocator::LocateAndAddDA( long addrOfDA )
                         SLPFree(pcRecvBuf);
                         pcRecvBuf = NULL;
 
+#ifdef ENABLE_SLP_LOGGING
                         SLP_LOG(SLP_LOG_DEBUG, "get_reply overflow, tcp failed from [%s] when locating and adding the DA...: %s",inet_ntoa(sin.sin_addr), slperror(err));
+#endif
                     }
                 }
             }
@@ -542,8 +601,9 @@ void SLPDALocator::AskDAForScopeSponserInfo( long addrOfDA )
     // add daOption->daList[i] to our list of DAs
     sin.sin_addr.s_addr = addrOfDA;
 
+#ifdef ENABLE_SLP_LOGGING
     SLP_LOG( SLP_LOG_DEBUG, "SLPDALocator::LocateAndAddDA going to ask DA:%s its info", inet_ntoa(sin.sin_addr) );
-
+#endif
     if (!(err = generate_srvrqst(pcSendBuf,&iMTU,"en","", "service:com.apple.slp.defaultRegistrationScope",""))) 
     {
         if ((err = get_unicast_result(
@@ -556,8 +616,9 @@ void SLPDALocator::AskDAForScopeSponserInfo( long addrOfDA )
                                         &len, 
                                         sin)) != SLP_OK) 
         {
+#ifdef ENABLE_SLP_LOGGING
             SLP_LOG( SLP_LOG_DA, "get_reply could not get_da_results from [%s]...: %s",inet_ntoa(sin.sin_addr), slperror(err) );
-            
+#endif            
             SLPFree(pcRecvBuf);
             pcRecvBuf = NULL;
         }
@@ -575,7 +636,9 @@ void SLPDALocator::AskDAForScopeSponserInfo( long addrOfDA )
                     SLPFree(pcRecvBuf);
                     pcRecvBuf = NULL;
 
+#ifdef ENABLE_SLP_LOGGING
                     SLP_LOG(SLP_LOG_DEBUG, "get_reply overflow, tcp failed from [%s]...: %s",inet_ntoa(sin.sin_addr), slperror(err));
+#endif
                 }
             }
         }

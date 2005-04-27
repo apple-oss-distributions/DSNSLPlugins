@@ -3,8 +3,6 @@
  *
  * @APPLE_LICENSE_HEADER_START@
  * 
- * Copyright (c) 1999-2003 Apple Computer, Inc.  All Rights Reserved.
- * 
  * This file contains Original Code and/or Modifications of Original Code
  * as defined in and that are subject to the Apple Public Source License
  * Version 2.0 (the 'License'). You may not use this file except in
@@ -43,6 +41,11 @@ CNBPServiceLookupThread::CNBPServiceLookupThread( CNSLPlugin* parentPlugin, char
     mServiceListRef = NULL;
 	mNABuffer = NULL;
 	mBuffer = NULL;
+	mResultList = NULL;
+	
+	if ( mResultList )
+		CFRelease( mResultList );
+	mResultList = NULL;
 }
 
 CNBPServiceLookupThread::~CNBPServiceLookupThread()
@@ -140,7 +143,7 @@ CNBPServiceLookupThread::DoLookupOnService( char* service, char *zone )
 			if ( mNABuffer && !AreWeCanceled() )
 				status = NBPGetServerList( service, zone, mNABuffer, &actualCount );
 			else
-				status = memFullErr;
+				status = eMemoryAllocError;
 			
 			// NBPGetServerList should return +1 if the maxCount was exceeded.
 			// currently, it doesn't, so this code will never get used.
@@ -149,7 +152,7 @@ CNBPServiceLookupThread::DoLookupOnService( char* service, char *zone )
 				bufferSize *= 2;
 				mNABuffer = (NBPNameAndAddress *)realloc( mNABuffer, bufferSize );
 				if ( mNABuffer == nil )
-					status = memFullErr;
+					status = eMemoryAllocError;
 				actualCount = bufferSize / sizeof(NBPNameAndAddress);
 			}	
 		}
@@ -159,9 +162,14 @@ CNBPServiceLookupThread::DoLookupOnService( char* service, char *zone )
 	// report
 	if ( status == noErr )
 	{
-		char urlStr[256]={0};
-		UInt16 urlLen;
-
+		char	urlStr[256]={0};
+		UInt16	urlLen;
+		char	nameUTF8Buf[256];
+		char	zoneUTF8Buf[256];
+		
+		if ( !mResultList )
+			mResultList = CFArrayCreateMutable( NULL, 0, NULL );
+		
 		// change "AFPServer" NBPType to "afp" url service type
 		if ( strcmp( service, kAFPServerNBPType ) == 0 )
 			strcpy( service, kAFPServerURLType );
@@ -172,9 +180,23 @@ CNBPServiceLookupThread::DoLookupOnService( char* service, char *zone )
 			{
 				urlLen = 256;
 
-				MakeGenericNBPURL( service, zone, mNABuffer[index].name, urlStr, &urlLen );
+				// we first need to convert the service name and zone into UTF8
+				CFStringRef		zoneUTF8Ref = CFStringCreateWithCString( NULL, zone, NSLGetSystemEncoding() );
+				CFStringRef		nameUTF8Ref = CFStringCreateWithCString( NULL, mNABuffer[index].name, NSLGetSystemEncoding() );
+				
+				if ( zoneUTF8Ref && nameUTF8Ref && CFStringGetCString( zoneUTF8Ref, zoneUTF8Buf, sizeof(zoneUTF8Buf), kCFStringEncodingUTF8 ) && CFStringGetCString( nameUTF8Ref, nameUTF8Buf, sizeof(nameUTF8Buf), kCFStringEncodingUTF8 ) )
+					MakeGenericNBPURL( service, zoneUTF8Buf, nameUTF8Buf, urlStr, &urlLen );
+				else
+					urlLen = 0;
+
 				urlStr[urlLen] = '\0';
-                
+
+				if ( zoneUTF8Ref )
+					CFRelease( zoneUTF8Ref );
+
+				if ( nameUTF8Ref )
+					CFRelease( nameUTF8Ref );
+					
 				if ( urlLen && !AreWeCanceled() )
 				{
                     CNSLResult* newResult = new CNSLResult();
@@ -205,9 +227,8 @@ CNBPServiceLookupThread::DoLookupOnService( char* service, char *zone )
                     }
                     else
                         newResult->AddAttribute( kDSNAttrRecordName, mNABuffer[index].name );		// this should be what is displayed
-
-                    AddResult( newResult );
-                    
+	
+					CFArrayAppendValue( mResultList, newResult );
                         
                     if ( nameKeyRef )
                         ::CFRelease( nameKeyRef );
@@ -215,6 +236,21 @@ CNBPServiceLookupThread::DoLookupOnService( char* service, char *zone )
                     if ( nameValueRef )
                         ::CFRelease( nameValueRef );
 				}
+			}
+		}
+
+		if ( !AreWeCanceled() && mResultList && CFArrayGetCount(mResultList) > 0 )
+			GetNodeToSearch()->AddServices( mResultList );	
+		else
+		{
+			CFIndex		numSearches = ::CFArrayGetCount( mResultList );
+			CNSLResult*	result;
+			
+			for ( CFIndex i=numSearches-1; i>=0; i-- )
+			{
+				result = (CNSLResult*)::CFArrayGetValueAtIndex( mResultList, i );
+				::CFArrayRemoveValueAtIndex( mResultList, i );
+				delete result;
 			}
 		}
 	}
@@ -253,7 +289,7 @@ CNBPServiceLookupThread::ConvertToLocalZoneIfThereAreNoZones( char* zoneName )
 	
 	mBuffer = (char *)malloc( bufferSize );
 	if ( mBuffer == NULL )
-		return memFullErr;
+		return eMemoryAllocError;
 
 	// go get the local zone list
 	if ( !AreWeCanceled() )

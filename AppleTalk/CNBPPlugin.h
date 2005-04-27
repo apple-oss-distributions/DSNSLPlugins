@@ -3,8 +3,6 @@
  *
  * @APPLE_LICENSE_HEADER_START@
  * 
- * Copyright (c) 1999-2003 Apple Computer, Inc.  All Rights Reserved.
- * 
  * This file contains Original Code and/or Modifications of Original Code
  * as defined in and that are subject to the Apple Public Source License
  * Version 2.0 (the 'License'). You may not use this file except in
@@ -53,8 +51,7 @@ public:
     virtual sInt32				InitPlugin				( void );
 	virtual sInt32				SetServerIdleRunLoopRef	( CFRunLoopRef idleRunLoopRef );
 
-            Boolean				IsScopeInReturnList		( const char* scope );
-            void				AddResult				( const char* url );
+	virtual Boolean				PluginSupportsServiceType( const char* serviceType );
     
             uInt32				fSignature;
 

@@ -3,8 +3,6 @@
  *
  * @APPLE_LICENSE_HEADER_START@
  * 
- * Copyright (c) 1999-2003 Apple Computer, Inc.  All Rights Reserved.
- * 
  * This file contains Original Code and/or Modifications of Original Code
  * as defined in and that are subject to the Apple Public Source License
  * Version 2.0 (the 'License'). You may not use this file except in
@@ -51,6 +49,9 @@ CFStringEncoding GetWindowsSystemEncodingEquivalent( void );
 Boolean ExceptionInResult( const char* resultPtr );
 int IsIPAddress(const char* adrsStr, long *ipAdrs);
 Boolean IsDNSName(char* theName);
+
+Boolean UseCapitalization( void );
+CFStringRef CFStringCreateCapitalizedWithCString( char* cstr, CFStringEncoding encoding );
 
 #define	kLMBGoodTimeOutVal			10		// seconds
 #define kMinTimeBetweenRetries		15*60	// fifteen minutes
@@ -99,6 +100,7 @@ public:
 			
 			void				ThreadStarted					( void ) { mThreadsRunning++; }
 			void				ThreadFinished					( void ) { mThreadsRunning--; }
+			
 protected: 
 			
 			sInt32				GetPrimaryInterfaceBroadcastAdrs( char** broadcastAddr );
@@ -171,5 +173,6 @@ CFArrayRef GetLMBInfoFromLMB	( CFStringRef workgroupRef, CFStringRef lmbNameRef 
 CFArrayRef ParseOutStringsFromSMBClientResult( char* smbClientResult, char* primaryKey, char* secondaryKey, char** outPtr  = NULL );
 Boolean IsStringInArray( CFStringRef theString, CFArrayRef theArray );
 
+const char* GetCodePageStringForCurrentSystem( void );
 
 #endif

@@ -3,8 +3,6 @@
  *
  * @APPLE_LICENSE_HEADER_START@
  * 
- * Copyright (c) 1999-2003 Apple Computer, Inc.  All Rights Reserved.
- * 
  * This file contains Original Code and/or Modifications of Original Code
  * as defined in and that are subject to the Apple Public Source License
  * Version 2.0 (the 'License'). You may not use this file except in
@@ -63,6 +61,7 @@
 #include "mslp.h"
 pthread_mutex_t	gPRListLock = PTHREAD_MUTEX_INITIALIZER;
 
+#ifdef USE_PR_LIST
 void prlist_modify(char **ppcList, struct sockaddr_in sin) 
 {
 	char pcSrcBuf[16] = {0};
@@ -77,7 +76,8 @@ void prlist_modify(char **ppcList, struct sockaddr_in sin)
     
     if (*ppcList != NULL) 
     {
-        if (!list_intersection(pcSrc,*ppcList)) 
+// don't bother checking, just add it
+//        if (!list_intersection(pcSrc,*ppcList)) 
         {  
             len = strlen(*ppcList) + strlen(pcSrc) + 1; /* old, comma, new item */
             *ppcList = safe_malloc(len+2,*ppcList,strlen(*ppcList));
@@ -90,6 +90,7 @@ void prlist_modify(char **ppcList, struct sockaddr_in sin)
     }
     pthread_mutex_unlock(&gPRListLock);
 }
+#endif
 
 int getlen(const char *pc) {
 
@@ -139,7 +140,7 @@ int recalc_sendBuf(char *pcBuf, int iLen, const char *pcList) {
   
   /* write the new, longer, pr list into the space we have made */
   if (add_string(pcBuf,iLen,pcList,&iPROffset) != SLP_OK) {
-    LOG(SLP_LOG_ERR,"recalc_sendBuf:  could not add_string the new PR List");
+    SLPLOG(SLP_LOG_ERR,"recalc_sendBuf:  could not add_string the new PR List");
     return -1;
   }
 

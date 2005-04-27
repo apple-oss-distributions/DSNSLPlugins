@@ -3,8 +3,6 @@
  *
  * @APPLE_LICENSE_HEADER_START@
  * 
- * Copyright (c) 1999-2003 Apple Computer, Inc.  All Rights Reserved.
- * 
  * This file contains Original Code and/or Modifications of Original Code
  * as defined in and that are subject to the Apple Public Source License
  * Version 2.0 (the 'License'). You may not use this file except in
@@ -30,6 +28,8 @@
  *  Copyright (c) 2003 __MyCompanyName__. All rights reserved.
  *
  */
+#include <mach/mach_time.h>	// for dsTimeStamp
+#include <syslog.h>
 
 #include "CNSLTimingUtils.h"
 
@@ -42,4 +42,33 @@ void SmartSleep( unsigned int microSeconds )
 	tval.tv_sec = microSeconds / 1000000;
 	tval.tv_usec = microSeconds % 1000000;
 	select(0, NULL, NULL, NULL, &tval);			// pass in zero descriptors, we are just interested in the timer
+}
+
+double dsTimestamp(void)
+{
+	static uint32_t	num		= 0;
+	static uint32_t	denom	= 0;
+	uint64_t		now;
+	
+	if (denom == 0) 
+	{
+		struct mach_timebase_info tbi;
+		kern_return_t r;
+		r = mach_timebase_info(&tbi);
+		if (r != KERN_SUCCESS) 
+		{
+			syslog( LOG_ALERT, "Warning: mach_timebase_info FAILED! - error = %u\n", r);
+			return 0;
+		}
+		else
+		{
+			num		= tbi.numer;
+			denom	= tbi.denom;
+		}
+	}
+	now = mach_absolute_time();
+	
+	return (double)(now * (double)num / denom / NSEC_PER_SEC);	// return seconds
+//	return (double)(now * (double)num / denom / NSEC_PER_USEC);	// return microsecs
+//	return (double)(now * (double)num / denom);	// return nanoseconds
 }

@@ -3,8 +3,6 @@
  *
  * @APPLE_LICENSE_HEADER_START@
  * 
- * Copyright (c) 1999-2003 Apple Computer, Inc.  All Rights Reserved.
- * 
  * This file contains Original Code and/or Modifications of Original Code
  * as defined in and that are subject to the Apple Public Source License
  * Version 2.0 (the 'License'). You may not use this file except in
@@ -78,7 +76,6 @@
 SLPInternalError  mslpd_init_network(SAState *psa)
 {
     int 				iErr, turnOn=1;
-    SLPInternalError	err;
     struct sockaddr_in	serv_addr;
     struct in_addr 		ina;
     char 				pcHost[256];
@@ -187,12 +184,14 @@ SLPInternalError  mslpd_init_network(SAState *psa)
     }
 
  /* set up multicast */
+#ifdef ENABLE_SLP_LOGGING
     if ((err = set_multicast_sender_interf(psa->sdUDP)) != SLP_OK)
     {
         SLP_LOG( SLP_LOG_DEBUG,"mslpd_init_network: set_multicast_sender_interf",err);
     }
     else
         SLP_LOG( SLP_LOG_DEBUG, "mslpd_init_network: set_multicast_sender_interf ok" );
+#endif
 
   FD_ZERO(&(psa->fds));
   FD_SET(psa->sdUDP,&(psa->fds));
